@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAR Survey Client-Side App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 1rem; }
+    form { margin-bottom: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #f5f5f5; }
+    .error { color: #b00020; margin-bottom: 1rem; }
+    .muted { color: #666; }
+    details { margin-top: 0.25rem; }
+    .hidden { display: none; }
+    .hint { font-size: 0.92rem; color: #666; margin-top: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>FAR Survey Calculator (Pure Client-Side)</h1>
+
+  <form id="upload-form">
+    <input type="file" id="csv-file" accept=".csv,text/csv" required />
+    <button type="submit">Analyze</button>
+    <div class="hint">Runs entirely in your browser; no server, no uploads.</div>
+  </form>
+
+  <div id="error" class="error hidden"></div>
+  <div id="results-root"></div>
+
+  <script>
+    const QUESTIONS = [
+      "[NUM] Instructor Q1_1 - The instructor helped me understand what I was expected to learn",
+      "[NUM] Instructor Q1_2 - The instructor explained the purpose of work I did in the course (things like discussions, assignments, exams, class activities)",
+      "[NUM] Instructor Q1_3 - The instructor made deadlines clear",
+      "[NUM] Instructor Q1_4 - The instructor was clear about how I would be graded",
+      "[NUM] Instructor Q1_5 - The instructor provided feedback that helped me learn",
+      "[NUM] Instructor Q2_1 - The instructor helped create an environment in the class (whether in person or online) that motivated me to learn",
+      "[NUM] Instructor Q2_2 - The instructor responded respectfully if I had  questions",
+      "[NUM] Instructor Q2_3 - The instructor helped me feel that I could succeed in the class",
+      "[NUM] Instructor Q2_4 - The instructor helped me understand different ways to apply what I learned",
+      "[NUM] Instructor Q2_5 - The instructor used approaches that encouraged me to participate in class activities (in person or online)",
+    ];
+
+    function normalizeSpaces(value) {
+      return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function valueFromAliases(row, aliases) {
+      for (const alias of aliases) {
+        const value = row[alias];
+        if (value !== undefined && value !== null && String(value).trim() !== "") {
+          return value;
+        }
+      }
+      return "";
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let current = "";
+      let row = [];
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') {
+              current += '"';
+              i += 1;
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            current += ch;
+          }
+          continue;
+        }
+
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ',') {
+          row.push(current);
+          current = "";
+        } else if (ch === '\n') {
+          row.push(current);
+          rows.push(row);
+          row = [];
+          current = "";
+        } else if (ch === '\r') {
+        } else {
+          current += ch;
+        }
+      }
+
+      row.push(current);
+      rows.push(row);
+
+      while (rows.length && rows[rows.length - 1].every((cell) => String(cell).trim() === "")) {
+        rows.pop();
+      }
+
+      if (!rows.length) return [];
+
+      const headers = rows[0];
+      const records = [];
+      for (let i = 1; i < rows.length; i += 1) {
+        const raw = rows[i];
+        if (!raw || raw.every((cell) => String(cell).trim() === "")) continue;
+
+        const record = {};
+        for (let c = 0; c < headers.length; c += 1) {
+          record[headers[c]] = raw[c] ?? "";
+        }
+        records.push(record);
+      }
+      return records;
+    }
+
+    function buildQuestionColumnMap(rows) {
+      const availableKeys = new Set();
+      for (const row of rows) {
+        for (const key of Object.keys(row)) {
+          availableKeys.add(key);
+        }
+      }
+
+      const normalizedKeyMap = new Map();
+      for (const key of availableKeys) {
+        normalizedKeyMap.set(normalizeSpaces(key), key);
+      }
+
+      return QUESTIONS.map((question) => normalizedKeyMap.get(normalizeSpaces(question)) || question);
+    }
+
+    function toIntOrNull(value) {
+      const parsed = Number.parseInt(String(value), 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function calculateResults(rows) {
+      const terms = [];
+      const instructors = [];
+      const courses = [];
+
+      for (const row of rows) {
+        const term = String(valueFromAliases(row, ["Term Name", "Term Name*"]));
+        const instructor = String(valueFromAliases(row, ["Instructor Name", "Instructor Name*"]));
+        const course = String(valueFromAliases(row, ["Course Code Dashboard", "Course Code Dashboard*"]));
+
+        if (!terms.includes(term)) terms.push(term);
+        if (!instructors.includes(instructor)) instructors.push(instructor);
+        if (!courses.includes(course)) courses.push(course);
+      }
+
+      const questionColumns = buildQuestionColumnMap(rows);
+      const results = [];
+
+      for (const term of terms) {
+        for (const instructor of instructors) {
+          for (const course of courses) {
+            const instructorSurvey = rows.filter((row) => {
+              const rowTerm = String(valueFromAliases(row, ["Term Name", "Term Name*"]));
+              const rowInstructor = String(valueFromAliases(row, ["Instructor Name", "Instructor Name*"]));
+              const rowCourse = String(valueFromAliases(row, ["Course Code Dashboard", "Course Code Dashboard*"]));
+              const surveySource = String(valueFromAliases(row, ["Survey Source", "Survey Source*"]));
+
+              return (
+                rowTerm === term &&
+                rowInstructor === instructor &&
+                rowCourse === course &&
+                surveySource.includes("Instructor")
+              );
+            });
+
+            const nTotal = instructorSurvey.length;
+            if (nTotal === 0) continue;
+
+            const questionBreakdown = [];
+            let weightedSum = 0;
+
+            for (let index = 0; index < questionColumns.length; index += 1) {
+              const questionColumn = questionColumns[index];
+              let nAll = 0;
+              let nSome = 0;
+
+              for (const row of instructorSurvey) {
+                const value = toIntOrNull(row[questionColumn]);
+                if (value === 3) nAll += 1;
+                if (value === 2) nSome += 1;
+              }
+
+              const pctAll = Math.round((nAll / nTotal) * 100);
+              const pctSome = Math.round((nSome / nTotal) * 100);
+
+              questionBreakdown.push({ questionNumber: index + 1, pctAll, pctSome });
+              weightedSum += pctAll + 0.5 * pctSome;
+            }
+
+            results.push({
+              term,
+              instructor,
+              course,
+              totalResponseCount: nTotal,
+              weightedAvg: weightedSum / (QUESTIONS.length * 100),
+              questionBreakdown,
+            });
+          }
+        }
+      }
+
+      return results;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById("error");
+      if (!message) {
+        errorDiv.textContent = "";
+        errorDiv.classList.add("hidden");
+      } else {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove("hidden");
+      }
+    }
+
+    function renderResults(results) {
+      const root = document.getElementById("results-root");
+      if (!results.length) {
+        root.innerHTML = '<p class="muted">No instructor survey rows were found in this file.</p>';
+        return;
+      }
+
+      const rowsHtml = results.map((result) => {
+        const qRows = result.questionBreakdown.map((q) => `
+          <tr>
+            <td>${q.questionNumber}</td>
+            <td>${q.pctAll}</td>
+            <td>${q.pctSome}</td>
+          </tr>
+        `).join("");
+
+        return `
+          <tr>
+            <td>${escapeHtml(result.term)}</td>
+            <td>${escapeHtml(result.instructor)}</td>
+            <td>${escapeHtml(result.course)}</td>
+            <td>${result.totalResponseCount}</td>
+            <td>${result.weightedAvg.toFixed(2)}</td>
+            <td>
+              <details>
+                <summary>View q1–q10 percentages</summary>
+                <table>
+                  <thead>
+                    <tr><th>Q#</th><th>% All</th><th>% Some</th></tr>
+                  </thead>
+                  <tbody>
+                    ${qRows}
+                  </tbody>
+                </table>
+              </details>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      root.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Term</th>
+              <th>Instructor</th>
+              <th>Course</th>
+              <th>Total Responses</th>
+              <th>Weighted Avg.</th>
+              <th>Question Breakdown</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById("upload-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showError("");
+
+      const input = document.getElementById("csv-file");
+      const file = input.files && input.files[0];
+      if (!file) {
+        showError("Please choose a CSV file.");
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        const rows = parseCsv(text);
+        if (!rows.length) {
+          showError("Could not parse CSV: file appears empty or invalid.");
+          return;
+        }
+
+        const results = calculateResults(rows);
+        renderResults(results);
+      } catch (error) {
+        showError(`Could not parse CSV: ${error.message || String(error)}`);
+      }
+    });
+  </script>
+</body>
+</html>

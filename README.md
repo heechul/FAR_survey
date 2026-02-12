@@ -43,6 +43,16 @@ Then open:
 http://127.0.0.1:5001
 ```
 
+## Pure client-side single HTML app (no Node/Python)
+
+Open this file directly in your browser:
+
+```
+client_webapp/index.html
+```
+
+It runs completely in-browser and works from `file://` without any server process.
+
 ## CLI usage
 
 Download the survey as CSV format from https://kusurvey.ca1.qualtrics.com. 
