@@ -19,8 +19,6 @@ const QUESTIONS = [
   "[NUM] Instructor Q2_5 - The instructor used approaches that encouraged me to participate in class activities (in person or online)",
 ];
 
-let lastResults = [];
-
 function normalizeSpaces(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
@@ -222,8 +220,7 @@ function renderPage(results = [], error = "") {
 
   ${
     hasResults
-      ? `<p><a href="/download">Download results as CSV</a></p>
-         <table>
+      ? `<table>
             <thead>
               <tr>
                 <th>Term</th>
@@ -242,43 +239,6 @@ function renderPage(results = [], error = "") {
   }
 </body>
 </html>`;
-}
-
-function toCsvCell(value) {
-  const text = String(value ?? "");
-  if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-function generateResultsCsv(results) {
-  const header = ["Term", "Instructor", "Course", "Total Responses", "Weighted Avg"];
-  for (let questionNum = 1; questionNum <= 10; questionNum += 1) {
-    header.push(`Q${questionNum} % All`);
-    header.push(`Q${questionNum} % Some`);
-  }
-
-  const lines = [header.map(toCsvCell).join(",")];
-
-  for (const result of results) {
-    const row = [
-      result.term,
-      result.instructor,
-      result.course,
-      result.totalResponseCount,
-      result.weightedAvg.toFixed(2),
-    ];
-
-    for (const question of result.questionBreakdown) {
-      row.push(question.pctAll);
-      row.push(question.pctSome);
-    }
-
-    lines.push(row.map(toCsvCell).join(","));
-  }
-
-  return `${lines.join("\n")}\n`;
 }
 
 app.get("/", (_req, res) => {
@@ -301,7 +261,6 @@ app.post("/analyze", upload.single("csv_file"), (req, res) => {
     });
 
     const results = calculateResults(rows);
-    lastResults = results;
 
     if (results.length === 0) {
       res.type("html").send(renderPage([], "No instructor survey rows were found in this file."));
@@ -315,18 +274,6 @@ app.post("/analyze", upload.single("csv_file"), (req, res) => {
       .status(400)
       .send(renderPage([], `Could not parse CSV: ${error.message || String(error)}`));
   }
-});
-
-app.get("/download", (_req, res) => {
-  if (!lastResults.length) {
-    res.status(400).type("text/plain").send("No results available to download.");
-    return;
-  }
-
-  const csv = generateResultsCsv(lastResults);
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", "attachment; filename=far_results_js.csv");
-  res.send(csv);
 });
 
 app.listen(PORT, () => {

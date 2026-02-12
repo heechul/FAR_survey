@@ -25,11 +25,11 @@ http://127.0.0.1:5000
 ```
 
 Upload a survey CSV file to view weighted FAR results by term, instructor, and course.
-After analysis, click "Download results as CSV" to export the table.
 
 ## JavaScript web app usage (no Python dependency)
 
 The JavaScript version is fully standalone and does not import or call any Python code.
+For internet-facing deployments, CSV download/export is intentionally disabled to reduce data-leak risk.
 
 ```
 cd js_webapp
