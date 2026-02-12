@@ -1,0 +1,15 @@
+{
+  "name": "far-survey-js-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone JavaScript web app for FAR survey weighted averages",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.6",
+    "express": "^4.21.2",
+    "multer": "^2.0.0"
+  }
+}

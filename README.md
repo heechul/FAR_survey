@@ -27,6 +27,22 @@ http://127.0.0.1:5000
 Upload a survey CSV file to view weighted FAR results by term, instructor, and course.
 After analysis, click "Download results as CSV" to export the table.
 
+## JavaScript web app usage (no Python dependency)
+
+The JavaScript version is fully standalone and does not import or call any Python code.
+
+```
+cd js_webapp
+npm install
+npm start
+```
+
+Then open:
+
+```
+http://127.0.0.1:5001
+```
+
 ## CLI usage
 
 Download the survey as CSV format from https://kusurvey.ca1.qualtrics.com. 
