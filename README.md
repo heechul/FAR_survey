@@ -5,8 +5,24 @@ KU student survey parser for FAR reporting.
 ## Prerequisite
 
 ```
-pip install pandas
+pip install pandas flask
 ```
+
+## Web app usage (local browser)
+
+Run the local web app:
+
+```
+python webapp.py
+```
+
+Then open:
+
+```
+http://127.0.0.1:5000
+```
+
+Upload a survey CSV file to view weighted FAR results by term, instructor, and course.
 
 ## Usage
 

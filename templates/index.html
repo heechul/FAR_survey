@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAR Survey Web App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 1rem; }
+    form { margin-bottom: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #f5f5f5; }
+    .error { color: #b00020; margin-bottom: 1rem; }
+    .muted { color: #666; }
+    details { margin-top: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>FAR Survey Calculator</h1>
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="csv_file" accept=".csv" required />
+    <button type="submit">Analyze</button>
+  </form>
+
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+
+  {% if results %}
+    <table>
+      <thead>
+        <tr>
+          <th>Term</th>
+          <th>Instructor</th>
+          <th>Course</th>
+          <th>Total Responses</th>
+          <th>Weighted Avg.</th>
+          <th>Question Breakdown</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in results %}
+          <tr>
+            <td>{{ result.term }}</td>
+            <td>{{ result.instructor }}</td>
+            <td>{{ result.course }}</td>
+            <td>{{ result.total_response_count }}</td>
+            <td>{{ "%.2f"|format(result.weighted_avg) }}</td>
+            <td>
+              <details>
+                <summary>View q1–q10 percentages</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Q#</th>
+                      <th>% All</th>
+                      <th>% Some</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for q in result.question_breakdown %}
+                      <tr>
+                        <td>{{ q.question_number }}</td>
+                        <td>{{ q.pct_all }}</td>
+                        <td>{{ q.pct_some }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </details>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Upload a FAR survey CSV to see results.</p>
+  {% endif %}
+</body>
+</html>
